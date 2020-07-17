@@ -192,3 +192,40 @@ for epoch in range(1, EPOCHS + 1):
     #tk0.set_postfix(loss=avg_loss)
     # Save model after every epoch (Optional)
     torch.save({"encoder": encoder.state_dict(), "decoder": decoder.state_dict(), "e_optimizer": encoder_optimizer.state_dict(),"d_optimizer": decoder_optimizer}, "./model.pt")
+    
+#Model Evaluation
+encoder.eval()
+decoder.eval()
+# Choose a random sentences
+i = random.randint(0,len(en_inputs)-1)
+h = encoder.init_hidden()
+inp = torch.tensor(en_inputs[i]).unsqueeze(0)
+encoder_outputs, h = encoder(inp,h)
+
+decoder_input = torch.tensor([en_w2i['_SOS']])
+decoder_hidden = h
+output = []
+attentions = []
+while True:
+  decoder_output, decoder_hidden, attn_weights = decoder(decoder_input, decoder_hidden, encoder_outputs)
+  _, top_index = decoder_output.topk(1)
+  decoder_input = torch.tensor([top_index.item()])
+  # If the decoder output is the End Of Sentence token, stop decoding process
+  if top_index.item() == de_w2i["_EOS"]:
+    break
+  output.append(top_index.item())
+  attentions.append(attn_weights.squeeze().cpu().detach().numpy())
+print("English: "+ " ".join([en_i2w[x] for x in en_inputs[i]]))
+print("Predicted: " + " ".join([de_i2w[x] for x in output]))
+print("Actual: " + " ".join([de_i2w[x] for x in de_inputs[i]]))
+
+# Plotting the heatmap for the Attention weights
+fig = plt.figure(figsize=(12,9))
+ax = fig.add_subplot(111)
+cax = ax.matshow(np.array(attentions))
+fig.colorbar(cax)
+ax.set_xticklabels(['']+[en_i2w[x] for x in en_inputs[i]])
+ax.set_yticklabels(['']+[de_i2w[x] for x in output])
+ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
+ax.yaxis.set_major_locator(ticker.MultipleLocator(1))
+plt.show()
